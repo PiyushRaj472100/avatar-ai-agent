@@ -9,7 +9,7 @@ from app.actions.search_summary import SearchSummaryAction
 from app.actions.system_control import SystemControlAction
 from app.memory.memory_manager import MemoryManager
 from app.core.query_classifier import classify_query
-from app.core.parallel_executor import ParallelExecutor
+from app.core.async_executor import AsyncExecutor
 from typing import Dict, Any
 from app.agents.agent_mode import AgentMode
 from app.actions.confirmation_handler import ConfirmationHandler
@@ -25,7 +25,7 @@ class CommanderAgent:
         self.llm = LLMInterface()
         self.memory = MemoryManager()
         self.confirmation = ConfirmationHandler()
-        self.parallel_executor = ParallelExecutor()
+        self.async_executor = AsyncExecutor()
         
         # Initialize available actions
         self.actions = {
@@ -80,13 +80,13 @@ class CommanderAgent:
             query_type = classify_query(command)
             
             if query_type == "dynamic":
-                # Use parallel execution for dynamic queries (best, compare, latest)
-                print(f"Dynamic query detected: {command} - using parallel execution")
-                return self.parallel_executor.get_parallel_response(command, query_type)
+                # Use async parallel execution for dynamic queries
+                print(f"Dynamic query detected: {command} - using async parallel execution")
+                return await self.async_executor.get_parallel_response(command, query_type)
             else:
-                # Use fast AI response for static queries (what is, explain, define)
+                # Use fast AI response for static queries
                 print(f"Static query detected: {command} - using AI knowledge")
-                return await self.llm.generate_response(command)
+                return await self.async_executor.fast_ai_response(command)
                 
         except Exception as e:
             return f"Error processing command: {str(e)}"
