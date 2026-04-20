@@ -23,14 +23,29 @@ class LLMInterface:
         Use LLM to decide which action to take based on the command and context
         """
         system_prompt = """
-        You are Avatar AI Agent's decision-making brain. Analyze the user's command and decide which action to take.
+        You are Avatar AI Agent's decision-making brain. Think intelligently about user intent.
+        
+        CRITICAL RULES:
+        1. For "find", "research", "compare", "best", "top" queries - USE search_summary
+        2. search_summary returns analyzed data WITHOUT opening browser
+        3. search_web opens browser - ONLY use when user explicitly asks to open/browse
+        4. Think about what the user REALLY wants - information or action?
         
         Available actions:
-        - open_apps: Open applications (parameters: app_name, optional: url)
-        - search_web: Search the web (parameters: query)
+        - search_summary: Intelligent search with analysis (parameters: query, engine, max_results)
+        - wikipedia_search: Reliable Wikipedia search (parameters: query)
+        - news_search: Real-time news search (parameters: query)
+        - search_web: Open browser with search (parameters: query, engine)
+        - open_apps: Open applications/websites (parameters: app_name, url)
         - system_control: Control system functions (parameters: command)
         
-        Respond with a JSON object containing:
+        Examples:
+        "Find best Python course" -> search_summary
+        "Compare laptops" -> search_summary
+        "Open chrome" -> open_apps
+        "Browse python tutorials" -> search_web
+        
+        Respond with JSON:
         {
             "action": "action_name",
             "parameters": {"key": "value"},
@@ -60,14 +75,30 @@ class LLMInterface:
     
     def _fallback_action_mapping(self, command: str) -> Dict[str, Any]:
         """
-        Simple fallback action mapping when LLM fails
+        Intelligent fallback action mapping when LLM fails
         """
         command_lower = command.lower()
         
-        if "open" in command_lower and ("chrome" in command_lower or "browser" in command_lower):
-            return {"action": "open_apps", "parameters": {"app_name": "chrome"}}
-        elif "search" in command_lower or "google" in command_lower:
+        # Handle "interested" requests with normal browser search
+        if any(phrase in command_lower for phrase in ["interested", "tell me more", "more info", "search for", "learn more"]):
             return {"action": "search_web", "parameters": {"query": command}}
+        # Handle open commands with link provision
+        elif "open" in command_lower:
+            clean_name = command_lower.replace("open", "").strip()
+            return {"action": "open_apps", "parameters": {"app_name": clean_name}}
+        elif any(word in command_lower for word in ["find", "research", "compare", "best", "top"]):
+            return {"action": "search_summary", "parameters": {"query": command, "max_results": 5}}
+        elif any(word in command_lower for word in ["what is", "define", "explain", "tell me about"]):
+            return {"action": "search_summary", "parameters": {"query": command, "max_results": 5}}
+        elif "browse" in command_lower or "search and browse" in command_lower:
+            return {"action": "search_web", "parameters": {"query": command}}
+        elif "wikipedia" in command_lower or "wiki" in command_lower:
+            clean_query = command.replace("wikipedia", "").replace("wiki", "").replace("search", "").strip()
+            return {"action": "wikipedia_search", "parameters": {"query": clean_query}}
+        elif "news" in command_lower or "latest" in command_lower or "current" in command_lower:
+            return {"action": "news_search", "parameters": {"query": command}}
+        elif "search" in command_lower:
+            return {"action": "search_summary", "parameters": {"query": command, "max_results": 3}}
         else:
             return {"action": "system_control", "parameters": {"command": command}}
     

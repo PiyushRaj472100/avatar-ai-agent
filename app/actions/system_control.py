@@ -48,6 +48,22 @@ class SystemControlAction:
                 else:
                     return f"File not found: {file_path}"
             
+            # Pass through open commands for products/courses to open_apps
+            elif command.startswith("open ") and any(keyword in command.lower() for keyword in ["macbook", "dell", "lenovo", "hp", "asus", "python", "coursera", "udemy", "edx", "course"]):
+                # This should be handled by open_apps action
+                return f"This command should be handled by open_apps: {command}"
+            
+            # Handle other commands - pass through to other actions
+            elif any(word in command for word in ["what is", "define", "explain", "tell me about"]):
+                # This should be handled by wikipedia_search
+                return f"This query should be handled by Wikipedia search: {command}"
+            elif any(word in command for word in ["python", "programming", "language", "computer"]):
+                # This should be handled by wikipedia_search
+                return f"This query should be handled by Wikipedia search: {command}"
+            elif any(word in command.lower() for word in ["vacation", "travel", "tourism", "india", "monsoon"]):
+                # This should be handled by search_summary
+                return f"This query should be handled by search_summary: {command}"
+            
             # Handle directory operations
             elif command.startswith("create folder "):
                 folder_name = command[13:].strip()

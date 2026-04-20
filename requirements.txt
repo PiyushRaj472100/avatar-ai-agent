@@ -11,6 +11,9 @@ pydantic==2.5.0
 
 # HTTP Client
 httpx==0.25.2
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==4.9.3
 
 # Development
 pytest==7.4.3

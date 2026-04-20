@@ -112,3 +112,40 @@ class MemoryManager:
         """
         memory = self._load_memory()
         return memory["interactions"][-count:] if memory["interactions"] else []
+    
+    def store_agent_task(self, agent_state: Dict[str, Any]):
+        """
+        Store a complete agent task execution in memory
+        """
+        memory = self._load_memory()
+        
+        agent_task = {
+            "type": "agent_task",
+            "timestamp": datetime.now().isoformat(),
+            "task": agent_state.get("task", ""),
+            "plan": agent_state.get("plan", []),
+            "completed_steps": agent_state.get("completed_steps", []),
+            "observations": agent_state.get("observations", []),
+            "final_result": agent_state.get("final_result", ""),
+            "is_complete": agent_state.get("is_complete", False),
+            "iterations_used": agent_state.get("current_iteration", 0),
+            "summary": agent_state.get("summary", {})
+        }
+        
+        # Add to interactions as a special entry
+        memory["interactions"].append(agent_task)
+        
+        # Keep only last 100 interactions
+        if len(memory["interactions"]) > 100:
+            memory["interactions"] = memory["interactions"][-100:]
+        
+        self._save_memory(memory)
+    
+    def get_agent_task_history(self, count: int = 5) -> List[Dict[str, Any]]:
+        """
+        Get recent agent task executions
+        """
+        memory = self._load_memory()
+        agent_tasks = [interaction for interaction in memory["interactions"] 
+                       if interaction.get("type") == "agent_task"]
+        return agent_tasks[-count:] if agent_tasks else []
