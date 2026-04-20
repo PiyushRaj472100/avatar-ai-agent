@@ -6,10 +6,11 @@ from app.brain.llm import LLMInterface
 from app.actions.open_apps import OpenAppsAction
 from app.actions.search_web import SearchWebAction
 from app.actions.search_summary import SearchSummaryAction
-from app.actions.wikipedia_search import WikipediaSearchAction
-from app.actions.news_search import NewsSearchAction
 from app.actions.system_control import SystemControlAction
 from app.memory.memory_manager import MemoryManager
+from app.core.query_classifier import classify_query
+from app.core.parallel_executor import ParallelExecutor
+from typing import Dict, Any
 from app.agents.agent_mode import AgentMode
 from app.actions.confirmation_handler import ConfirmationHandler
 import json
@@ -23,18 +24,19 @@ class CommanderAgent:
     def __init__(self):
         self.llm = LLMInterface()
         self.memory = MemoryManager()
-        self.agent_mode = AgentMode()
         self.confirmation = ConfirmationHandler()
+        self.parallel_executor = ParallelExecutor()
         
         # Initialize available actions
         self.actions = {
             "open_apps": OpenAppsAction(),
             "search_web": SearchWebAction(),
             "search_summary": SearchSummaryAction(),
-            "wikipedia_search": WikipediaSearchAction(),
-            "news_search": NewsSearchAction(),
             "system_control": SystemControlAction()
         }
+        
+        # Agent mode
+        self.agent_mode = AgentMode(self.actions)
     
     async def process_command(self, command: str, use_agent_mode: bool = False) -> str:
         """
@@ -58,46 +60,33 @@ class CommanderAgent:
     
     async def _process_simple_command(self, command: str) -> str:
         """
-        Process a simple command (original functionality)
+        Process a simple command using new non-blocking architecture
         """
         try:
             # Get context from memory
             context = self.memory.get_context()
             
-            # Direct routing for speed - skip LLM for common patterns
+            # Direct routing for app and interest commands (instant)
             command_lower = command.lower()
-            if any(word in command_lower for word in ["best", "compare", "top", "find", "research"]):
-                action_decision = {"action": "search_summary", "parameters": {"query": command, "max_results": 5}}
-            elif any(word in command_lower for word in ["vacation", "travel", "tourism", "india", "monsoon"]):
-                action_decision = {"action": "search_summary", "parameters": {"query": command, "max_results": 5}}
-            elif any(word in command_lower for word in ["what is", "define", "explain", "tell me about"]):
-                action_decision = {"action": "search_summary", "parameters": {"query": command, "max_results": 5}}
-            elif "open" in command_lower:
+            if "open" in command_lower:
                 clean_name = command_lower.replace("open", "").strip()
-                action_decision = {"action": "open_apps", "parameters": {"app_name": clean_name}}
+                action = self.actions["open_apps"]
+                return await action.execute({"app_name": clean_name})
             elif any(phrase in command_lower for phrase in ["interested", "tell me more", "more info"]):
-                action_decision = {"action": "search_web", "parameters": {"query": command}}
+                action = self.actions["search_web"]
+                return await action.execute({"query": command})
+            
+            # Classify query type for intelligent handling
+            query_type = classify_query(command)
+            
+            if query_type == "dynamic":
+                # Use parallel execution for dynamic queries (best, compare, latest)
+                print(f"Dynamic query detected: {command} - using parallel execution")
+                return self.parallel_executor.get_parallel_response(command, query_type)
             else:
-                # Use LLM only for complex/unclear commands
-                action_decision = await self.llm.decide_action(command, context)
-            
-            # Parse the action decision
-            action_name = action_decision.get("action")
-            action_params = action_decision.get("parameters", {})
-            
-            # Debug logging
-            print(f"LLM Decision: {action_name} for command: {command}")
-            
-            # Execute the action
-            if action_name in self.actions:
-                result = await self.actions[action_name].execute(action_params)
-                
-                # Store the interaction in memory
-                self.memory.store_interaction(command, action_name, result)
-                
-                return result
-            else:
-                return f"Unknown action: {action_name}"
+                # Use fast AI response for static queries (what is, explain, define)
+                print(f"Static query detected: {command} - using AI knowledge")
+                return await self.llm.generate_response(command)
                 
         except Exception as e:
             return f"Error processing command: {str(e)}"
