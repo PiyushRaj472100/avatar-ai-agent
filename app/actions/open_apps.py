@@ -1,25 +1,20 @@
 """
-Open Apps Action - Opens applications and websites
+Open Apps Action - Intelligent app opening with natural language understanding
 """
 
 import subprocess
 import webbrowser
 import platform
 from typing import Dict, Any
+from app.core.smart_app_detector import SmartAppDetector
 
 class OpenAppsAction:
     """
-    Action for opening applications and websites
+    Action for opening applications and websites with intelligent detection
     """
     
     def __init__(self):
-        self.app_mappings = {
-            "chrome": "chrome.exe",
-            "firefox": "firefox.exe",
-            "notepad": "notepad.exe",
-            "calculator": "calc.exe",
-            "explorer": "explorer.exe"
-        }
+        self.app_detector = SmartAppDetector()
         
         # Product links for quick opening
         self.product_links = {
@@ -37,101 +32,49 @@ class OpenAppsAction:
     
     async def execute(self, parameters: Dict[str, Any]) -> str:
         """
-        Execute the open apps action
+        Execute the open apps action with intelligent detection
         """
-        app_name = parameters.get("app_name", "").lower()
+        app_name = parameters.get("app_name", "")
         url = parameters.get("url", "")
         
-        try:
-            if url:
-                # Open URL in default browser
-                webbrowser.open(url)
-                return f"Opened URL: {url}"
+        if url:
+            # Open URL in default browser
+            webbrowser.open(url)
+            return f"Opened URL: {url}"
+        
+        elif app_name:
+            if app_name in ["browser", "web", "internet"]:
+                # Open default browser
+                webbrowser.open("https://www.google.com")
+                return "Opened default browser"
             
-            elif app_name:
-                if app_name in ["browser", "web", "internet"]:
-                    # Open default browser
-                    webbrowser.open("https://www.google.com")
-                    return "Opened default browser"
-                
-                # If it doesn't start with http, check if it's an app or URL
-                if not app_name.startswith(('http://', 'https://')):
-                    # Check if it's a Windows executable
-                    if app_name.endswith('.exe') or platform.system() == 'Windows':
-                        try:
-                            if platform.system() == 'Windows':
-                                # Try to open as Windows application
-                                subprocess.Popen(['start', app_name], shell=True)
-                                return f"Opened {app_name}"
-                        except:
-                            pass
-                    
-                    # Check for product links
-                    found_link = None
-                    if app_name in self.product_links:
-                        found_link = self.product_links[app_name]
-                    else:
-                        # Check for partial matches
-                        for product_name, link in self.product_links.items():
-                            if product_name in app_name or app_name in product_name:
-                                found_link = link
-                                break
-                    
-                    if found_link:
-                        # Provide the link and let user do normal search
-                        return f"Found {app_name}. Here's the link: {found_link}\n\nIf you're interested, I can do a normal browser search for more information about {app_name}."
-                    else:
-                        # Try to open as application first
-                        try:
-                            if platform.system() == 'Windows':
-                                subprocess.Popen(['start', app_name], shell=True)
-                                return f"Opened {app_name}"
-                            elif platform.system() == 'Darwin':  # macOS
-                                subprocess.Popen(['open', app_name])
-                                return f"Opened {app_name}"
-                            else:  # Linux
-                                subprocess.Popen(['xdg-open', app_name])
-                                return f"Opened {app_name}"
-                        except:
-                            return f"Unable to open {app_name}. Please check if the application is installed."
-                
-                elif app_name in self.app_mappings:
-                    # Open specific application
-                    try:
-                        if app_name == "calculator":
-                            subprocess.Popen(["start", "calc"], shell=True)
+            # Use intelligent app detection
+            app_path, is_installed, detection_method = self.app_detector.find_app(app_name)
+            
+            if is_installed and app_path:
+                try:
+                    # Open the found app
+                    if platform.system() == 'Windows':
+                        if app_path.endswith('.exe'):
+                            subprocess.Popen([app_path], shell=True)
                         else:
-                            subprocess.Popen([self.app_mappings[app_name]])
-                        return f"Opened {app_name}"
-                    except Exception as e:
-                        return f"Error opening {app_name}: {str(e)}"
-                
-                else:
-                    # Try to open as a website
-                    if not app_name.startswith(("http://", "https://")):
-                        app_name = f"https://{app_name}.com"
-                    webbrowser.open(app_name)
-                    return f"Opened {app_name}"
+                            subprocess.Popen(['start', app_path], shell=True)
+                    elif platform.system() == 'Darwin':  # macOS
+                        subprocess.Popen(['open', app_path])
+                    else:  # Linux
+                        subprocess.Popen(['xdg-open', app_path])
+                    
+                    normalized_name = self.app_detector.normalize_app_name(app_name)
+                    return f"✅ Opened {normalized_name} (found via {detection_method})"
+                    
+                except Exception as e:
+                    return f"❌ Error opening {app_name}: {str(e)}"
             
             else:
-                # Check if it's a product we know about (improved matching)
-                found_link = None
-                
-                # Check for exact match first
-                if app_name in self.product_links:
-                    found_link = self.product_links[app_name]
-                else:
-                    # Check for partial matches
-                    for product_name, link in self.product_links.items():
-                        if product_name in app_name or app_name in product_name:
-                            found_link = link
-                            break
-                
-                if found_link:
-                    # Provide the link and let user do normal search
-                    return f"Found {app_name}. Here's the link: {found_link}\n\nIf you're interested, I can do a normal browser search for more information about {app_name}."
-                else:
-                    return "No app name or URL provided"
-                
-        except Exception as e:
-            return f"Error opening app: {str(e)}"
+                # App not found - provide comprehensive installation guide
+                normalized_name = self.app_detector.normalize_app_name(app_name)
+                response = self.app_detector.format_installation_response(app_name)
+                return response
+        
+        else:
+            return "No app name or URL provided"

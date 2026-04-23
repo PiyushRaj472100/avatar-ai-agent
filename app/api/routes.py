@@ -7,7 +7,13 @@ from app.schemas.command_schema import CommandRequest, CommandResponse, AgentMod
 from app.agents.commander import CommanderAgent
 
 router = APIRouter()
-commander = CommanderAgent()
+commander = None
+
+def get_commander():
+    global commander
+    if commander is None:
+        commander = CommanderAgent()
+    return commander
 
 @router.post("/command", response_model=CommandResponse)
 async def execute_command(request: CommandRequest):
@@ -15,10 +21,13 @@ async def execute_command(request: CommandRequest):
     Execute a simple command through the AI agent
     """
     try:
-        # Auto-detect if agent mode should be used
-        use_agent_mode = await commander.should_use_agent_mode(request.command)
+        # Get commander instance (lazy initialization)
+        cmd = get_commander()
         
-        response = await commander.process_command(request.command, use_agent_mode)
+        # Auto-detect if agent mode should be used
+        use_agent_mode = await cmd.should_use_agent_mode(request.command)
+        
+        response = await cmd.process_command(request.command, use_agent_mode)
         
         return CommandResponse(
             success=True,
@@ -39,7 +48,8 @@ async def execute_agent_task(request: CommandRequest):
     Execute a complex task using Agent Mode (multi-step planning and execution)
     """
     try:
-        response = await commander.process_command(request.command, use_agent_mode=True)
+        cmd = get_commander()
+        response = await cmd.process_command(request.command, use_agent_mode=True)
         
         return CommandResponse(
             success=True,
@@ -59,7 +69,8 @@ async def execute_simple_command(request: CommandRequest):
     Execute a simple command without Agent Mode (forces simple execution)
     """
     try:
-        response = await commander.process_command(request.command, use_agent_mode=False)
+        cmd = get_commander()
+        response = await cmd.process_command(request.command, use_agent_mode=False)
         
         return CommandResponse(
             success=True,

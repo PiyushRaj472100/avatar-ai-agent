@@ -16,11 +16,11 @@ class AsyncExecutor:
     
     async def fast_ai_response(self, query: str) -> str:
         """
-        Non-blocking Gemini call using asyncio.to_thread
+        Non-blocking Gemini call - direct async
         """
         try:
-            # Wrap sync Gemini call in async thread
-            return await asyncio.to_thread(self.llm.generate_response, query)
+            # Call async method directly (no double wrapping)
+            return await self.llm.generate_response(query)
         except Exception as e:
             print(f"Gemini error: {e}")
             return "Processing your request..."
@@ -105,7 +105,7 @@ class AsyncExecutor:
         """
         
         try:
-            # Wrap merge in async thread (non-blocking)
-            return await asyncio.to_thread(self.llm.generate_response, merge_prompt)
+            # Call async method directly (no double wrapping)
+            return await self.llm.generate_response(merge_prompt)
         except:
             return ai_answer  # Fallback to original

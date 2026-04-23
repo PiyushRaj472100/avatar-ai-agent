@@ -12,7 +12,6 @@ from app.core.query_classifier import classify_query
 from app.core.async_executor import AsyncExecutor
 from typing import Dict, Any
 from app.agents.agent_mode import AgentMode
-from app.actions.confirmation_handler import ConfirmationHandler
 import json
 
 class CommanderAgent:
@@ -24,7 +23,6 @@ class CommanderAgent:
     def __init__(self):
         self.llm = LLMInterface()
         self.memory = MemoryManager()
-        self.confirmation = ConfirmationHandler()
         self.async_executor = AsyncExecutor()
         
         # Initialize available actions
@@ -36,7 +34,7 @@ class CommanderAgent:
         }
         
         # Agent mode
-        self.agent_mode = AgentMode(self.actions)
+        self.agent_mode = AgentMode()
     
     async def process_command(self, command: str, use_agent_mode: bool = False) -> str:
         """
@@ -68,8 +66,13 @@ class CommanderAgent:
             
             # Direct routing for app and interest commands (instant)
             command_lower = command.lower()
-            if "open" in command_lower:
-                clean_name = command_lower.replace("open", "").strip()
+            app_commands = ["open", "launch", "start", "run"]
+            if any(cmd in command_lower for cmd in app_commands):
+                # Remove the command word and clean up
+                for cmd in app_commands:
+                    if cmd in command_lower:
+                        clean_name = command_lower.replace(cmd, "").strip()
+                        break
                 action = self.actions["open_apps"]
                 return await action.execute({"app_name": clean_name})
             elif any(phrase in command_lower for phrase in ["interested", "tell me more", "more info"]):
